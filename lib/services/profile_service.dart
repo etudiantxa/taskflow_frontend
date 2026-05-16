@@ -1,0 +1,77 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../models/user.dart';
+import 'session_service.dart';
+
+class ProfileService {
+  // ✨ URL corrigée avec le préfixe /api pour correspondre au backend NestJS
+  static const String baseUrl = 'http://10.0.2.2:3000/api';
+  static const String profileEndpoint = '$baseUrl/auths/profils';
+
+  // ✨ RÉCUPÉRER LE PROFIL ACTUEL
+  static Future<User> getProfile() async {
+    try {
+      final token = await SessionService.getToken();
+      if (token == null) throw Exception('Non authentifié');
+
+      final response = await http.get(
+        Uri.parse(profileEndpoint),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        final userData = json is Map && json.containsKey('user') ? json['user'] : json;
+        return User.fromJson(userData);
+      } else {
+        throw Exception('Erreur ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Erreur récupération profil: $e');
+    }
+  }
+
+  // ✨ METTRE À JOUR LE PROFIL
+  static Future<User> updateProfile({
+    required String nom,
+    required String prenom,
+    required String email,
+    required String username,
+    String? photo,
+  }) async {
+    try {
+      final token = await SessionService.getToken();
+      if (token == null) throw Exception('Non authentifié');
+
+      final response = await http.put(
+        Uri.parse(profileEndpoint),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'nom': nom,
+          'prenom': prenom,
+          'email': email,
+          'username': username,
+          if (photo != null) 'photo': photo,
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        final userData = json is Map && json.containsKey('user') ? json['user'] : json;
+        final user = User.fromJson(userData);
+        await SessionService.saveUser(user);
+        return user;
+      } else {
+        throw Exception('Erreur ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Erreur mise à jour profil: $e');
+    }
+  }
+}
