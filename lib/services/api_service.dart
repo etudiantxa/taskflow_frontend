@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/task.dart';
+import '../core/constants.dart'; // ✨ Import centralisé
 import 'cache_service.dart';
 import 'session_service.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://10.0.2.2:3000/api'; 
+  // ✨ Utilisation de l'URL centralisée
+  static const String baseUrl = ApiConstants.baseUrl; 
   static const String taskEndpoint = '$baseUrl/task';
 
   static Future<Map<String, dynamic>> getAllTasks({
@@ -59,7 +61,7 @@ class ApiService {
       final body = jsonEncode({
         'title': title,
         'content': content,
-        'priority': priority, // ✨ Envoi tel quel (ex: "Medium")
+        'priority': priority,
         'status': status ?? 'Todo',
         'color': color ?? 'blue',
         'dueDate': dueDate?.toIso8601String(),

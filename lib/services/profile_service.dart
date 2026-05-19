@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
+import '../core/constants.dart'; // ✨ Import centralisé
 import 'session_service.dart';
 
 class ProfileService {
-  // ✨ URL corrigée avec le préfixe /api pour correspondre au backend NestJS
-  static const String baseUrl = 'http://10.0.2.2:3000/api';
+  // ✨ Utilisation de l'URL centralisée
+  static const String baseUrl = ApiConstants.baseUrl;
   static const String profileEndpoint = '$baseUrl/auths/profils';
 
   // ✨ RÉCUPÉRER LE PROFIL ACTUEL

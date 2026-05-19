@@ -145,6 +145,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _isEditing = false;
           _isSaving = false;
         });
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Profil mis à jour !"), backgroundColor: Colors.green)
         );
@@ -152,22 +153,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
-        _showErrorDialog(e.toString());
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erreur Backend : $e"), backgroundColor: Colors.red)
+        );
       }
     }
   }
 
-  void _showErrorDialog(String error) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1F26),
-        title: const Text("Erreur Backend (400)", style: TextStyle(color: Colors.white)),
-        content: Text(
-          "Le serveur rejette les modifications. Vérifiez que votre DTO NestJS autorise les champs nom, prenom, email et username.\n\n$error",
-          style: const TextStyle(color: Colors.grey, fontSize: 13),
-        ),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+  void _showComingSoon() {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Cette fonctionnalité sera implémentée plus tard"),
+        duration: Duration(seconds: 2),
+        backgroundColor: Color(0xFF2563EB),
       ),
     );
   }
@@ -185,6 +184,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         title: const Text("Profil", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         centerTitle: true,
+        actions: [
+          IconButton(icon: const Icon(Icons.more_vert, color: Colors.white), onPressed: () {}),
+        ],
       ),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB))) 
@@ -216,9 +218,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 
                 const SizedBox(height: 32),
-                _buildStatsRow(),
+                Row(
+                  children: [
+                    _buildStatCard("Tâches terminées", "$_completedCount", Icons.check_circle, const Color(0xFF2563EB)),
+                    const SizedBox(width: 16),
+                    _buildStatCard("En attente", "$_pendingCount", Icons.assignment_late, const Color(0xFFF59E0B)),
+                  ],
+                ),
+                
                 const SizedBox(height: 32),
-                _buildSettingsList(),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text("Paramètres", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(height: 16),
+                
+                _buildMenuItem(Icons.notifications_none, "Notifications", onTap: () => Navigator.pushNamed(context, '/notifications')),
+                _buildMenuItem(Icons.palette_outlined, "Apparence", onTap: _showComingSoon),
+                _buildMenuItem(Icons.security_outlined, "Sécurité", onTap: _showComingSoon),
+                _buildMenuItem(Icons.help_outline, "Aide & Support", onTap: _showComingSoon),
+                
                 const SizedBox(height: 24),
                 _buildLogoutButton(),
                 const SizedBox(height: 40),
@@ -230,23 +249,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildAvatarSection() {
-    Widget imageWidget;
+    ImageProvider avatarImage;
     if (_pickedXFile != null) {
-      imageWidget = kIsWeb 
-          ? Image.network(_pickedXFile!.path, fit: BoxFit.cover)
-          : Image.file(File(_pickedXFile!.path), fit: BoxFit.cover);
+      avatarImage = kIsWeb ? NetworkImage(_pickedXFile!.path) : FileImage(File(_pickedXFile!.path)) as ImageProvider;
     } else if (_currentUser?.photo != null && _currentUser!.photo!.isNotEmpty) {
       if (_currentUser!.photo!.startsWith('http')) {
-        imageWidget = Image.network(_currentUser!.photo!, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.person, size: 50));
+        avatarImage = NetworkImage(_currentUser!.photo!);
       } else {
         try {
-          imageWidget = Image.memory(base64Decode(_currentUser!.photo!), fit: BoxFit.cover);
+          avatarImage = MemoryImage(base64Decode(_currentUser!.photo!));
         } catch (e) {
-          imageWidget = const Icon(Icons.person, size: 50);
+          avatarImage = NetworkImage('https://ui-avatars.com/api/?name=${_currentUser?.nom ?? "U"}&background=random');
         }
       }
     } else {
-      imageWidget = Image.network('https://ui-avatars.com/api/?name=${_currentUser?.nom ?? "U"}&background=random', fit: BoxFit.cover);
+      avatarImage = NetworkImage('https://ui-avatars.com/api/?name=${_currentUser?.nom ?? "U"}&background=random');
     }
 
     return Center(
@@ -255,14 +272,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Container(width: 120, height: 120, decoration: BoxDecoration(color: const Color(0xFFFDE68A).withOpacity(0.15), shape: BoxShape.circle)),
             Container(
-              width: 100, height: 100,
-              decoration: const BoxDecoration(color: Color(0xFF1A1F26), shape: BoxShape.circle),
-              child: ClipOval(child: imageWidget),
+              width: 120, height: 120,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFDE68A).withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+            ),
+            CircleAvatar(
+              radius: 50,
+              backgroundColor: const Color(0xFF1A1F26),
+              backgroundImage: avatarImage,
             ),
             Positioned(
-              right: 4, bottom: 4,
+              right: 4,
+              bottom: 4,
               child: Container(
                 padding: const EdgeInsets.all(6),
                 decoration: const BoxDecoration(color: Color(0xFF2563EB), shape: BoxShape.circle),
@@ -285,7 +309,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: _isSaving 
         ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-        : Text(_isEditing ? "Enregistrer" : "Modifier le profil", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        : Text(_isEditing ? "Enregistrer" : "Modifier le profil", 
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
     );
   }
 
@@ -306,16 +331,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildStatsRow() {
-    return Row(
-      children: [
-        _buildStatCard("Tâches terminées", "$_completedCount", Icons.check_circle, const Color(0xFF2563EB)),
-        const SizedBox(width: 16),
-        _buildStatCard("En attente", "$_pendingCount", Icons.assignment_late, const Color(0xFFF59E0B)),
-      ],
-    );
-  }
-
   Widget _buildStatCard(String label, String count, IconData icon, Color color) {
     return Expanded(
       child: Container(
@@ -324,26 +339,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [Icon(icon, color: color, size: 18), const SizedBox(width: 8), Expanded(child: Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)))]),
+            Row(
+              children: [
+                Icon(icon, color: color, size: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w500))),
+              ],
+            ),
             const SizedBox(height: 12),
             Text(count, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildSettingsList() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text("Paramètres", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        _buildMenuItem(Icons.notifications_none, "Notifications", onTap: () => Navigator.pushNamed(context, '/notifications')),
-        _buildMenuItem(Icons.palette_outlined, "Apparence"),
-        _buildMenuItem(Icons.security_outlined, "Sécurité"),
-        _buildMenuItem(Icons.help_outline, "Aide & Support"),
-      ],
     );
   }
 
@@ -353,7 +360,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(color: const Color(0xFF1A1F26), borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         leading: Icon(icon, color: Colors.grey[400], size: 22),
-        title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14)),
+        title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
         trailing: const Icon(Icons.chevron_right, color: Colors.grey, size: 18),
         onTap: onTap,
       ),
@@ -367,9 +374,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (mounted) Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
       },
       child: Container(
-        width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(color: const Color(0xFFEF4444).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-        child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.logout, color: Color(0xFFEF4444), size: 20), const SizedBox(width: 10), Text("Déconnexion", style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold))]),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEF4444).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.logout, color: Color(0xFFEF4444), size: 20),
+            const SizedBox(width: 10),
+            Text("Déconnexion", style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
+          ],
+        ),
       ),
     );
   }
@@ -382,7 +400,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           _navItem(Icons.check_circle_outline, "Tâches", false, () => Navigator.pushReplacementNamed(context, '/dashboard')),
           _navItem(Icons.calendar_today_outlined, "Calendrier", false, () {}),
-          _navItem(Icons.notifications_none, "Notifications", false, () => Navigator.pushNamed(context, '/notifications')),
+          _navItem(Icons.folder_open_outlined, "Projets", false, () {}),
           _navItem(Icons.person, "Profil", true, () {}),
         ],
       ),

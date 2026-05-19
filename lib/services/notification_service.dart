@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/notification.dart';
+import '../core/constants.dart'; // ✨ Import centralisé
 import 'session_service.dart';
 
 class NotificationService {
-  // ✨ URL corrigée avec le préfixe /api
-  static const String baseUrl = 'http://10.0.2.2:3000/api'; 
+  // ✨ Utilisation de l'URL centralisée
+  static const String baseUrl = ApiConstants.baseUrl; 
   static const String notificationEndpoint = '$baseUrl/notifications';
 
   // ✨ Récupérer toutes les notifications
@@ -68,7 +69,7 @@ class NotificationService {
         headers: {'Authorization': 'Bearer $token'},
       );
     } catch (e) {
-      throw Exception('Erreur suppression notification: $e');
+      print('Erreur suppression notification: $e');
     }
   }
 

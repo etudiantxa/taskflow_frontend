@@ -1,7 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/task.dart';
+import '../models/user.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
+import '../services/session_service.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 
@@ -13,13 +16,12 @@ class TasksDashboard extends StatefulWidget {
 }
 
 class _TasksDashboardState extends State<TasksDashboard> {
-  int _selectedIndex = 0;
   String _selectedPriority = 'All';
   TaskStatus? _selectedStatus;
 
   List<Task> _allTasks = [];
+  User? _currentUser;
   bool _isLoading = true;
-  String? _errorMessage;
 
   final TextEditingController _searchController = TextEditingController();
   int _unreadCount = 0;
@@ -29,6 +31,7 @@ class _TasksDashboardState extends State<TasksDashboard> {
     super.initState();
     _loadTasks();
     _loadUnreadCount();
+    _loadCurrentUser();
   }
 
   @override
@@ -37,16 +40,28 @@ class _TasksDashboardState extends State<TasksDashboard> {
     super.dispose();
   }
 
+  Future<void> _loadCurrentUser() async {
+    final user = await SessionService.getUser();
+    if (mounted) {
+      setState(() {
+        _currentUser = user;
+      });
+    }
+  }
+
   Future<void> _loadUnreadCount() async {
     try {
       final count = await NotificationService.countUnreadNotifications();
-      setState(() => _unreadCount = count);
+      if (mounted) {
+        setState(() => _unreadCount = count);
+      }
     } catch (e) {
-      print('Erreur notifications: $e');
+      debugPrint('Erreur notifications: $e');
     }
   }
 
   Future<void> _loadTasks() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       String? pFilter = _selectedPriority == 'All' ? null : _selectedPriority.toUpperCase();
@@ -56,7 +71,7 @@ class _TasksDashboardState extends State<TasksDashboard> {
         limit: 100,
       );
 
-      List<Task> tasks = result['tasks'] as List<Task>;
+      List<Task> tasks = (result['tasks'] as List).cast<Task>();
 
       if (_selectedStatus != null) {
         tasks = tasks.where((t) => t.status == _selectedStatus).toList();
@@ -66,15 +81,14 @@ class _TasksDashboardState extends State<TasksDashboard> {
         tasks = tasks.where((t) => t.title.toLowerCase().contains(query)).toList();
       }
 
-      setState(() {
-        _allTasks = tasks;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _allTasks = tasks;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Erreur : $e';
-        _isLoading = false;
-      });
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -99,7 +113,12 @@ class _TasksDashboardState extends State<TasksDashboard> {
               padding: EdgeInsets.fromLTRB(16, 25, 16, 10),
               child: Text(
                 "ACTIVE TASKS",
-                style: TextStyle(color: Color(0xFF4B5563), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+                style: TextStyle(
+                  color: Color(0xFF4B5563),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.2,
+                ),
               ),
             ),
             Expanded(child: _buildTaskList()),
@@ -121,20 +140,42 @@ class _TasksDashboardState extends State<TasksDashboard> {
   }
 
   Widget _buildHeader() {
+    ImageProvider avatarImage;
+    if (_currentUser?.photo != null && _currentUser!.photo!.isNotEmpty) {
+      if (_currentUser!.photo!.startsWith('http')) {
+        avatarImage = NetworkImage(_currentUser!.photo!);
+      } else {
+        try {
+          avatarImage = MemoryImage(base64Decode(_currentUser!.photo!));
+        } catch (e) {
+          avatarImage = const NetworkImage('https://ui-avatars.com/api/?name=User');
+        }
+      }
+    } else {
+      avatarImage = NetworkImage('https://ui-avatars.com/api/?name=${_currentUser?.nom ?? "User"}&background=random');
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
       child: Row(
         children: [
-          const CircleAvatar(
+          CircleAvatar(
             radius: 22,
-            backgroundImage: NetworkImage('https://ui-avatars.com/api/?name=User&background=random'),
+            backgroundImage: avatarImage,
+            backgroundColor: const Color(0xFF1A1F26),
           ),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("My Tasks", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-              Text(DateFormat('EEEE, MMM dd').format(DateTime.now()), style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+              const Text(
+                "My Tasks",
+                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                DateFormat('EEEE, MMM dd').format(DateTime.now()),
+                style: TextStyle(color: Colors.grey[500], fontSize: 13),
+              ),
             ],
           ),
           const Spacer(),
@@ -144,7 +185,7 @@ class _TasksDashboardState extends State<TasksDashboard> {
               isLabelVisible: _unreadCount > 0,
               child: const Icon(Icons.notifications_none, color: Colors.white, size: 28),
             ),
-            onPressed: () => Navigator.pushNamed(context, '/notifications'),
+            onPressed: () => Navigator.pushNamed(context, '/notifications').then((_) => _loadUnreadCount()),
           ),
         ],
       ),
@@ -198,10 +239,24 @@ class _TasksDashboardState extends State<TasksDashboard> {
               child: Row(
                 children: [
                   if (ps[i] != 'All Tasks') ...[
-                    Container(width: 6, height: 6, decoration: BoxDecoration(shape: BoxShape.circle, color: _getPriorityColor(ps[i]))),
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _getPriorityColor(ps[i]),
+                      ),
+                    ),
                     const SizedBox(width: 8),
                   ],
-                  Text(ps[i], style: TextStyle(color: isSelected ? Colors.white : Colors.grey[400], fontWeight: FontWeight.bold, fontSize: 12)),
+                  Text(
+                    ps[i],
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.grey[400],
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -247,7 +302,10 @@ class _TasksDashboardState extends State<TasksDashboard> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF2A2F36)),
               ),
-              child: Text(ss[i]['l'] as String, style: TextStyle(color: isSelected ? Colors.white : Colors.grey[500], fontSize: 12)),
+              child: Text(
+                ss[i]['l'] as String,
+                style: TextStyle(color: isSelected ? Colors.white : Colors.grey[500], fontSize: 12),
+              ),
             ),
           );
         },
@@ -256,15 +314,49 @@ class _TasksDashboardState extends State<TasksDashboard> {
   }
 
   Widget _buildTaskList() {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
-    if (_allTasks.isEmpty) return const Center(child: Text("No tasks found", style: TextStyle(color: Colors.grey)));
+    if (_isLoading) return const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)));
+    if (_allTasks.isEmpty) return const Center(child: Text("Aucune tâche trouvée", style: TextStyle(color: Colors.grey)));
+
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
       itemCount: _allTasks.length,
-      itemBuilder: (context, i) => GestureDetector(
-        onTap: () => Navigator.of(context).pushNamed('/task_details', arguments: _allTasks[i]).then((_) => _loadTasks()),
-        child: _TaskCard(task: _allTasks[i], onShare: _shareTask),
-      ),
+      itemBuilder: (context, i) {
+        final task = _allTasks[i];
+        return Dismissible(
+          key: Key(task.id),
+          direction: DismissDirection.endToStart,
+          onDismissed: (direction) async {
+            try {
+              await ApiService.deleteTask(int.parse(task.id));
+              setState(() {
+                _allTasks.removeAt(i);
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Tâche supprimée"), backgroundColor: Colors.green),
+              );
+            } catch (e) {
+              _loadTasks();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("Erreur lors de la suppression: $e"), backgroundColor: Colors.red),
+              );
+            }
+          },
+          background: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 20),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.8),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.delete, color: Colors.white),
+          ),
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).pushNamed('/task_details', arguments: task).then((_) => _loadTasks()),
+            child: _TaskCard(task: task, onShare: _shareTask),
+          ),
+        );
+      },
     );
   }
 
@@ -277,7 +369,10 @@ class _TasksDashboardState extends State<TasksDashboard> {
           _navItem(Icons.check_circle_outline, "Tâches", true, () {}),
           _navItem(Icons.calendar_today_outlined, "Calendrier", false, () {}),
           _navItem(Icons.folder_open_outlined, "Projets", false, () {}),
-          _navItem(Icons.person_outline, "Profil", false, () => Navigator.pushNamed(context, '/profile')),
+          _navItem(Icons.person_outline, "Profil", false, () => Navigator.pushNamed(context, '/profile').then((_) {
+            _loadCurrentUser();
+            _loadTasks();
+          })),
         ],
       ),
     );
@@ -319,27 +414,47 @@ class _TaskCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text(task.getPriorityLabel(), style: TextStyle(color: task.getPriorityColor(), fontSize: 10, fontWeight: FontWeight.w900)),
+                Text(
+                  task.getPriorityLabel(),
+                  style: TextStyle(color: task.getPriorityColor(), fontSize: 10, fontWeight: FontWeight.w900),
+                ),
                 const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: task.getStatusColor().withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
-                  child: Text(task.getStatusLabel(), style: TextStyle(color: task.getStatusColor(), fontSize: 9, fontWeight: FontWeight.bold)),
+                  decoration: BoxDecoration(
+                    color: task.getStatusColor().withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    task.getStatusLabel(),
+                    style: TextStyle(color: task.getStatusColor(), fontSize: 9, fontWeight: FontWeight.bold),
+                  ),
                 ),
                 const SizedBox(width: 15),
                 GestureDetector(onTap: () => onShare(task), child: const Icon(Icons.share_outlined, color: Colors.grey, size: 18)),
               ],
             ),
             const SizedBox(height: 12),
-            Text(task.title, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+            Text(
+              task.title,
+              style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 6),
-            Text(task.description, style: const TextStyle(color: Colors.grey, fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(
+              task.description,
+              style: const TextStyle(color: Colors.grey, fontSize: 14),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
             const SizedBox(height: 20),
             Row(
               children: [
                 const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
                 const SizedBox(width: 8),
-                Text("Due: ${DateFormat('MMM dd, yyyy').format(task.dueDate)}", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                Text(
+                  "Due: ${DateFormat('MMM dd, yyyy').format(task.dueDate)}",
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
               ],
             )
           ],

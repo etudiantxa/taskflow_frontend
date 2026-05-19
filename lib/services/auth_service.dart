@@ -2,12 +2,12 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
 import '../models/auth_response.dart';
+import '../core/constants.dart'; // ✨ Import centralisé
 import 'session_service.dart';
 
 class AuthService {
-  // ✨ URL de base du backend
-  static const String baseUrl = 'http://10.0.2.2:3000/api'; 
-  static const String authEndpoint = '$baseUrl/auths';
+  // ✨ Utilisation de l'URL centralisée
+  static const String authEndpoint = '${ApiConstants.baseUrl}/auths';
 
   // ✨ LOGIN
   static Future<AuthResponse> login({
@@ -209,7 +209,6 @@ class AuthService {
       print('✅ Déconnexion réussie');
     } catch (e) {
       print('❌ Erreur logout: $e');
-      throw Exception('Erreur déconnexion: $e');
     }
   }
 }
