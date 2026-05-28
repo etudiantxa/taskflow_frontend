@@ -10,23 +10,20 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _tokenController = TextEditingController();
   bool _isLoading = false;
   String? _message;
   bool _isError = false;
-  bool _isSent = false;
 
   @override
   void dispose() {
     _emailController.dispose();
-    _tokenController.dispose();
     super.dispose();
   }
 
   Future<void> _requestReset() async {
     if (_emailController.text.isEmpty) {
       setState(() {
-        _message = "Veuillez entrer votre email";
+        _message = "Veuillez entrer votre adresse email";
         _isError = true;
       });
       return;
@@ -40,34 +37,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     try {
       await AuthService.forgotPassword(_emailController.text);
       setState(() {
-        _message = "Si cet email existe, vous allez recevoir un code de récupération.";
+        _message = "Lien envoyé ! Vérifiez votre boîte de réception.";
         _isError = false;
-        _isSent = true;
       });
     } catch (e) {
       setState(() {
-        _message = "Une erreur est survenue. Veuillez réessayer.";
+        _message = "Impossible d'envoyer l'email. Réessayez plus tard.";
         _isError = true;
       });
     } finally {
       setState(() => _isLoading = false);
     }
-  }
-
-  void _goToResetPassword() {
-    if (_tokenController.text.isEmpty) {
-      setState(() {
-        _message = "Veuillez coller le code/jeton reçu par email";
-        _isError = true;
-      });
-      return;
-    }
-    // On navigue vers l'écran de réinitialisation en passant le token
-    Navigator.pushNamed(
-      context, 
-      '/reset-password', 
-      arguments: {'token': _tokenController.text}
-    );
   }
 
   @override
@@ -81,93 +61,130 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Connexion", style: TextStyle(color: Colors.grey, fontSize: 13)),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.symmetric(horizontal: 30),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              _isSent ? "Vérifiez vos emails" : "Mot de passe oublié ?",
-              style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              _isSent 
-                ? "Collez ci-dessous le jeton de sécurité que vous avez reçu par email."
-                : "Entrez votre adresse email pour recevoir un lien de réinitialisation.",
-              style: TextStyle(color: Colors.grey[500], fontSize: 16),
+            const SizedBox(height: 20),
+            // ✨ TaskFlow Pro Header
+            const Text(
+              "TaskFlow Pro",
+              style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 40),
             
-            if (_message != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 20),
+            // ✨ Icone Header (Cercle avec cadenas)
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: _isError ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: _isError ? Colors.red : Colors.green),
+                  color: const Color(0xFF1A1F26),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(
-                  _message!,
-                  style: TextStyle(color: _isError ? Colors.red : Colors.green, fontSize: 14),
-                ),
+                child: const Icon(Icons.lock_reset_rounded, color: Color(0xFF2563EB), size: 40),
               ),
+            ),
+            const SizedBox(height: 40),
+            
+            // Titre et Sous-titre
+            const Text(
+              "Mot de passe oublié ?",
+              style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "Ne vous inquiétez pas, cela arrive. Entrez votre adresse e-mail pour recevoir les instructions de réinitialisation.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey[500], fontSize: 14, height: 1.5),
+            ),
+            const SizedBox(height: 40),
 
-            if (!_isSent) ...[
-              const Text("Email", style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _emailController,
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration("votre@email.com", Icons.email_outlined),
-              ),
-              const SizedBox(height: 30),
-              
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _requestReset,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("Envoyer le lien", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            if (_message != null)
+              _statusMessage(_message!, _isError ? Colors.red : Colors.green),
+
+            // Champ Email
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text("Adresse e-mail", style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _emailController,
+              style: const TextStyle(color: Colors.white),
+              decoration: _inputDecoration("nom@exemple.com", Icons.email_outlined),
+            ),
+            
+            const SizedBox(height: 30),
+
+            // Bouton Envoyer
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _requestReset,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
+                child: _isLoading
+                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text("Envoyer le lien", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          SizedBox(width: 10),
+                          Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
+                        ],
+                      ),
               ),
-            ] else ...[
-              const Text("Jeton de sécurité", style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _tokenController,
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration("Collez le jeton ici...", Icons.security),
+            ),
+
+            const SizedBox(height: 40),
+            const Text("ou", style: TextStyle(color: Colors.grey, fontSize: 12)),
+            const SizedBox(height: 20),
+
+            // Retour Login
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.chevron_left, color: Color(0xFF2563EB), size: 20),
+                  Text("Retour à la connexion", style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold)),
+                ],
               ),
-              const SizedBox(height: 30),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: _goToResetPassword,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text("Continuer", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-              ),
-              TextButton(
-                onPressed: () => setState(() => _isSent = false),
-                child: const Center(child: Text("Renvoyer l'email", style: TextStyle(color: Colors.grey))),
-              )
-            ],
+            ),
+
+            const SizedBox(height: 60),
+            Text(
+              "© 2024 TaskFlow Pro — Sécurisé par cryptage AES-256",
+              style: TextStyle(color: Colors.grey[800], fontSize: 11),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _statusMessage(String text, Color color) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 25),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.3))
+      ),
+      child: Text(text, style: TextStyle(color: color, fontSize: 13), textAlign: TextAlign.center),
     );
   }
 
@@ -178,7 +195,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       suffixIcon: Icon(icon, color: Colors.grey[700], size: 20),
       filled: true,
       fillColor: const Color(0xFF1A1F26),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2A2F36))),
     );

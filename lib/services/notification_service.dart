@@ -52,7 +52,7 @@ class NotificationService {
     try {
       final token = await SessionService.getToken();
       await http.patch(
-        Uri.parse('$notificationEndpoint/all/read'),
+        Uri.parse('$notificationEndpoint/all/read'), // ✨ Corrigé : all/read au lieu de all-read
         headers: {'Authorization': 'Bearer $token'},
       );
     } catch (e) {
