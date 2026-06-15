@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:app_links/app_links.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'services/cache_service.dart';
 import 'services/session_service.dart';
 import 'screens/login_screen.dart';
@@ -12,28 +13,24 @@ import 'screens/notifications_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/reset_password_screen.dart';
+import 'screens/calendar_screen.dart';
+import 'screens/projects_screen.dart';
+import 'screens/add_project_screen.dart';
+import 'screens/project_details_screen.dart';
 import 'models/task.dart';
+import 'models/project.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // ✨ Initialiser Hive
+  await initializeDateFormatting('fr_FR', null);
   await CacheService.initHive();
-
-  // ✨ Vérifier si utilisateur est connecté
   final isLoggedIn = await SessionService.isLoggedIn();
-
   runApp(MyApp(isLoggedIn: isLoggedIn));
 }
 
 class MyApp extends StatefulWidget {
   final bool isLoggedIn;
-
-  const MyApp({
-    Key? key,
-    this.isLoggedIn = false,
-  }) : super(key: key);
-
+  const MyApp({Key? key, this.isLoggedIn = false}) : super(key: key);
   @override
   State<MyApp> createState() => _MyAppState();
 }
@@ -55,34 +52,18 @@ class _MyAppState extends State<MyApp> {
     super.dispose();
   }
 
-  // ✨ Configuration du Deep Linking
   Future<void> initDeepLinks() async {
     _appLinks = AppLinks();
-
-    // 1. Gère le lien si l'app est déjà ouverte en arrière-plan
-    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
-      debugPrint('🔗 Lien reçu (ouvert): $uri');
-      _handleDeepLink(uri);
-    });
-
-    // 2. Gère le lien si l'app était complètement fermée
+    _linkSubscription = _appLinks.uriLinkStream.listen((uri) => _handleDeepLink(uri));
     final initialUri = await _appLinks.getInitialLink();
-    if (initialUri != null) {
-      debugPrint('🔗 Lien initial (fermé): $initialUri');
-      _handleDeepLink(initialUri);
-    }
+    if (initialUri != null) _handleDeepLink(initialUri);
   }
 
   void _handleDeepLink(Uri uri) {
-    // Vérifie si le chemin correspond à la réinitialisation
     if (uri.path.contains('reset-password') || uri.host == 'reset-password') {
       final token = uri.queryParameters['token'];
       if (token != null) {
-        debugPrint('✅ Token extrait du lien: $token');
-        _navigatorKey.currentState?.pushNamed(
-          '/reset-password',
-          arguments: {'token': token},
-        );
+        _navigatorKey.currentState?.pushNamed('/reset-password', arguments: {'token': token});
       }
     }
   }
@@ -90,7 +71,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: _navigatorKey, // ✨ Important pour la navigation automatique
+      navigatorKey: _navigatorKey,
       title: 'TaskFlow',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -103,9 +84,7 @@ class _MyAppState extends State<MyApp> {
       onGenerateRoute: (settings) {
         if (settings.name == '/reset-password') {
           final args = settings.arguments as Map<String, dynamic>?;
-          return MaterialPageRoute(
-            builder: (context) => ResetPasswordScreen(token: args?['token']),
-          );
+          return MaterialPageRoute(builder: (context) => ResetPasswordScreen(token: args?['token']));
         }
         return null;
       },
@@ -122,6 +101,13 @@ class _MyAppState extends State<MyApp> {
         '/add_task': (context) => const AddTaskScreen(),
         '/notifications': (context) => const NotificationsScreen(),
         '/profile': (context) => const ProfileScreen(),
+        '/calendar': (context) => const CalendarScreen(),
+        '/projects': (context) => const ProjectsScreen(),
+        '/add_project': (context) => const AddProjectScreen(),
+        '/project_details': (context) {
+          final project = ModalRoute.of(context)?.settings.arguments as Project;
+          return ProjectDetailsScreen(project: project);
+        },
       },
     );
   }

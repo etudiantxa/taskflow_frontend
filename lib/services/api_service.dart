@@ -1,13 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/task.dart';
-import '../core/constants.dart'; // ✨ Import centralisé
+import '../core/constants.dart';
 import 'cache_service.dart';
 import 'session_service.dart';
 
 class ApiService {
-  // ✨ Utilisation de l'URL centralisée
-  static const String baseUrl = ApiConstants.baseUrl; 
+  static const String baseUrl = ApiConstants.baseUrl;
   static const String taskEndpoint = '$baseUrl/task';
 
   static Future<Map<String, dynamic>> getAllTasks({
@@ -53,11 +52,18 @@ class ApiService {
     DateTime? dueDate,
     String? status,
     String? color,
+    List<String>? assignedUserIds,
   }) async {
     try {
       final token = await SessionService.getToken();
-      print('🚀 Envoi de la tâche au backend...');
       
+      // ✨ Conversion des IDs en entiers pour NestJS
+      final List<int> numericIds = (assignedUserIds ?? [])
+          .map((id) => int.tryParse(id))
+          .where((id) => id != null)
+          .cast<int>()
+          .toList();
+
       final body = jsonEncode({
         'title': title,
         'content': content,
@@ -65,26 +71,22 @@ class ApiService {
         'status': status ?? 'Todo',
         'color': color ?? 'blue',
         'dueDate': dueDate?.toIso8601String(),
+        'assignedUserIds': numericIds,
       });
-      
-      print('📦 Body envoyé: $body');
 
       final response = await http.post(
         Uri.parse(taskEndpoint),
         headers: {
-          'Authorization': 'Bearer $token', 
+          'Authorization': 'Bearer $token',
           'Content-Type': 'application/json'
         },
         body: body,
       ).timeout(const Duration(seconds: 10));
 
-      print('📥 Réponse Serveur (${response.statusCode}): ${response.body}');
-
       if (response.statusCode != 200 && response.statusCode != 201) {
         throw Exception('Erreur serveur (${response.statusCode}): ${response.body}');
       }
     } catch (e) {
-      print('❌ Erreur détaillée: $e');
       rethrow;
     }
   }
@@ -97,20 +99,43 @@ class ApiService {
     DateTime? dueDate,
     String? status,
     String? color,
+    List<String>? assignedUserIds,
   }) async {
-    final token = await SessionService.getToken();
-    await http.patch(
-      Uri.parse('$taskEndpoint/$id'),
-      headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
-      body: jsonEncode({
+    try {
+      final token = await SessionService.getToken();
+      
+      // ✨ Conversion des IDs en entiers pour NestJS
+      final List<int> numericIds = (assignedUserIds ?? [])
+          .map((id) => int.tryParse(id))
+          .where((id) => id != null)
+          .cast<int>()
+          .toList();
+
+      final body = jsonEncode({
         'title': title,
         'content': content,
         'priority': priority,
-        'status': status ?? 'Todo',
+        'status': status,
         'color': color ?? 'blue',
         'dueDate': dueDate?.toIso8601String(),
-      }),
-    );
+        'assignedUserIds': numericIds,
+      });
+
+      final response = await http.patch(
+        Uri.parse('$taskEndpoint/$id'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json'
+        },
+        body: body,
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        throw Exception('Erreur serveur (${response.statusCode}): ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
   }
 
   static Future<void> deleteTask(int id) async {

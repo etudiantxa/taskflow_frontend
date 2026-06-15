@@ -1,15 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
-import '../core/constants.dart'; // ✨ Import centralisé
+import '../core/constants.dart';
 import 'session_service.dart';
 
 class ProfileService {
-  // ✨ Utilisation de l'URL centralisée
   static const String baseUrl = ApiConstants.baseUrl;
   static const String profileEndpoint = '$baseUrl/auths/profils';
 
-  // ✨ RÉCUPÉRER LE PROFIL ACTUEL
   static Future<User> getProfile() async {
     try {
       final token = await SessionService.getToken();
@@ -35,7 +33,33 @@ class ProfileService {
     }
   }
 
-  // ✨ METTRE À JOUR LE PROFIL
+  // ✨ RÉCUPÉRER TOUS LES UTILISATEURS
+  static Future<List<User>> getAllUsers() async {
+    try {
+      final token = await SessionService.getToken();
+      // ✨ Utilisation de /users comme indiqué pour votre backend
+      final response = await http.get(
+        Uri.parse('$baseUrl/users'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      print('📥 Response Users Status: ${response.statusCode}');
+      print('📥 Response Users Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> json = jsonDecode(response.body);
+        return json.map((u) => User.fromJson(u)).toList();
+      }
+      return [];
+    } catch (e) {
+      print('❌ Erreur getAllUsers: $e');
+      return [];
+    }
+  }
+
   static Future<User> updateProfile({
     required String nom,
     required String prenom,

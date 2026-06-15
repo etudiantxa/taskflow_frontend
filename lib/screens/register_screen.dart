@@ -17,8 +17,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  File? _imageFile; // Pour stocker l'image choisie
+  File? _imageFile; 
   bool _isLoading = false;
+  bool _obscurePassword = true;
   String? _errorMessage;
 
   @override
@@ -31,13 +32,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  // Fonction pour choisir l'image via la galerie
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     try {
       final pickedFile = await picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 500, // On réduit la taille pour le backend
+        maxWidth: 500,
         maxHeight: 500,
       );
       if (pickedFile != null) {
@@ -66,15 +66,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      // Note: Si votre backend ne gère pas encore les fichiers (Multipart),
-      // vous pouvez passer _imageFile?.path ou le convertir en Base64 ici.
       await AuthService.register(
         nom: _nomController.text,
         prenom: _prenomController.text,
         username: _usernameController.text,
         email: _emailController.text,
         password: _passwordController.text,
-        photo: _imageFile?.path, // On envoie le chemin du fichier local
+        photo: _imageFile?.path,
       );
 
       if (mounted) {
@@ -121,10 +119,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey[500], fontSize: 13),
               ),
-
               const SizedBox(height: 30),
-
-              // --- ZONE PHOTO DE PROFIL ---
               GestureDetector(
                 onTap: _pickImage,
                 child: Stack(
@@ -159,10 +154,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       color: Colors.grey,
                       fontSize: 10,
                       fontWeight: FontWeight.bold)),
-
               const SizedBox(height: 30),
-
-              // --- BOUTONS SOCIAUX ---
               Row(
                 children: [
                   Expanded(child: _socialButton("Google", Icons.g_mobiledata)),
@@ -170,19 +162,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   Expanded(child: _socialButton("Apple", Icons.apple)),
                 ],
               ),
-
               const SizedBox(height: 20),
               const Text("OU", style: TextStyle(color: Colors.grey, fontSize: 12)),
               const SizedBox(height: 20),
-
-              // --- FORMULAIRE ---
               if (_errorMessage != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Text(_errorMessage!,
                       style: const TextStyle(color: Colors.red, fontSize: 12)),
                 ),
-
               Row(
                 children: [
                   Expanded(
@@ -198,12 +186,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
               _buildField("Email", _emailController, "jean.dupont@exemple.fr",
                   icon: Icons.email_outlined),
               const SizedBox(height: 16),
-              _buildField("Mot de passe", _passwordController, "********",
-                  isPassword: true, icon: Icons.visibility_off_outlined),
-
+              _buildField(
+                "Mot de passe", 
+                _passwordController, 
+                "********",
+                isPassword: _obscurePassword, 
+                icon: _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                onIconTap: () => setState(() => _obscurePassword = !_obscurePassword),
+              ),
               const SizedBox(height: 30),
-
-              // --- BOUTON S'INSCRIRE ---
               SizedBox(
                 width: double.infinity,
                 height: 52,
@@ -223,7 +214,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           fontWeight: FontWeight.bold)),
                 ),
               ),
-
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -247,9 +237,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // Widget pour les champs de saisie (Conforme au design)
   Widget _buildField(String label, TextEditingController controller, String hint,
-      {bool isPassword = false, IconData? icon}) {
+      {bool isPassword = false, IconData? icon, VoidCallback? onIconTap}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -265,7 +254,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
             hintText: hint,
             hintStyle: TextStyle(color: Colors.grey[700], fontSize: 14),
             suffixIcon: icon != null
-                ? Icon(icon, color: Colors.grey[700], size: 20)
+                ? GestureDetector(
+                    onTap: onIconTap,
+                    child: Icon(icon, color: Colors.grey[700], size: 20),
+                  )
                 : null,
             filled: true,
             fillColor: const Color(0xFF1A1F26),
@@ -283,7 +275,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // Widget pour les boutons Google/Apple
   Widget _socialButton(String label, IconData icon) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),

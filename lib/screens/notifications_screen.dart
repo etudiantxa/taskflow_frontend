@@ -55,9 +55,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
         ),
         title: const Text("Notifications", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         centerTitle: true,
-        actions: [
-          IconButton(icon: const Icon(Icons.settings_outlined, color: Colors.white), onPressed: () {}),
-        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: const Color(0xFF2563EB),
@@ -75,10 +72,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
         children: [
           _buildList(_notifications),
           _buildList(_notifications.where((n) => !n.isRead).toList()),
-          _buildList(_notifications.where((n) => n.type == 'OVERDUE' || n.type == 'URGENT').toList()),
+          _buildList(_notifications.where((n) => 
+            n.type == 'OVERDUE' || n.type == 'URGENT' || n.type == 'TASK_EXPIRED'
+          ).toList()),
         ],
       ),
-      bottomNavigationBar: _buildBottomNav(),
     );
   }
 
@@ -86,23 +84,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     if (_isLoading) return const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)));
     if (list.isEmpty) return const Center(child: Text("Aucune notification", style: TextStyle(color: Colors.grey)));
 
-    final now = DateTime.now();
-    final today = list.where((n) => n.createdAt.day == now.day && n.createdAt.month == now.month).toList();
-    final earlier = list.where((n) => !today.contains(n)).toList();
-
-    return ListView(
+    return ListView.builder(
       padding: const EdgeInsets.all(16),
-      children: [
-        if (today.isNotEmpty) ...[
-          _buildSectionHeader("AUJOURD'HUI", true),
-          ...today.map((n) => _buildDismissibleCard(n)),
-        ],
-        if (earlier.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          _buildSectionHeader("PLUS ANCIENNES", false),
-          ...earlier.map((n) => _buildDismissibleCard(n)),
-        ],
-      ],
+      itemCount: list.length,
+      itemBuilder: (context, i) => _buildDismissibleCard(list[i]),
     );
   }
 
@@ -110,20 +95,164 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     return Dismissible(
       key: Key(n.id.toString()),
       direction: DismissDirection.endToStart,
-      onDismissed: (direction) => _deleteNotification(n.id),
+      onDismissed: (direction) async {
+        await NotificationService.deleteNotification(n.id);
+        setState(() => _notifications.removeWhere((item) => item.id == n.id));
+      },
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.red.withOpacity(0.8),
-          borderRadius: BorderRadius.circular(16),
-        ),
+        decoration: BoxDecoration(color: Colors.red.withOpacity(0.8), borderRadius: BorderRadius.circular(16)),
         child: const Icon(Icons.delete, color: Colors.white),
       ),
       child: _NotificationCard(
         notification: n, 
-        onTap: () => _markAsRead(n.id)
+        onTap: () => _showNotificationPopup(n),
+      ),
+    );
+  }
+
+  void _showNotificationPopup(Notification n) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFF1A1F26),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Color(n.getColor()).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      n.type == 'OVERDUE' || n.type == 'DUE_SOON' || n.type == 'TASK_EXPIRED' 
+                        ? Icons.alarm_on_rounded 
+                        : Icons.notifications_active_rounded,
+                      color: Color(n.getColor()),
+                      size: 28,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: Colors.grey, size: 24),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      n.title,
+                      style: const TextStyle(
+                        color: Colors.white, 
+                        fontSize: 22, 
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    getTimeAgo(n.createdAt),
+                    style: TextStyle(color: Colors.grey[500], fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                n.content,
+                style: TextStyle(
+                  color: Colors.grey[400], 
+                  fontSize: 15, 
+                  height: 1.6,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text("Fermer", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        _markAsRead(n.id);
+                        Navigator.pop(context);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(color: Colors.grey[800]!),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.done_all, color: Colors.white.withOpacity(0.9), size: 18),
+                          const SizedBox(width: 8),
+                          const Flexible(
+                            child: Text(
+                              "Marquer comme lu", 
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        await NotificationService.deleteNotification(n.id);
+                        setState(() => _notifications.removeWhere((item) => item.id == n.id));
+                        Navigator.pop(context);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: const BorderSide(color: Color(0xFFEF4444)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),
+                          const SizedBox(width: 8),
+                          Text("Supprimer", style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -131,68 +260,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
   Future<void> _markAsRead(int id) async {
     await NotificationService.markAsRead(id);
     _loadNotifications();
-  }
-
-  Future<void> _deleteNotification(int id) async {
-    try {
-      await NotificationService.deleteNotification(id);
-      setState(() {
-        _notifications.removeWhere((n) => n.id == id);
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur suppression: $e'))
-      );
-    }
-  }
-
-  Widget _buildSectionHeader(String label, bool showAction) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
-          if (showAction)
-            GestureDetector(
-              onTap: () async {
-                await NotificationService.markAllAsRead();
-                _loadNotifications();
-              },
-              child: const Text("Tout marquer comme lu", style: TextStyle(color: Color(0xFF2563EB), fontSize: 11, fontWeight: FontWeight.bold)),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNav() {
-    return BottomAppBar(
-      color: const Color(0xFF0F1419),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _navItem(Icons.check_circle_outline, "Tâches", false, () => Navigator.pushReplacementNamed(context, '/dashboard')),
-          _navItem(Icons.calendar_today_outlined, "Calendrier", false, () {}),
-          _navItem(Icons.notifications, "Notifications", true, () {}),
-          _navItem(Icons.person_outline, "Profil", false, () => Navigator.pushReplacementNamed(context, '/profile')),
-        ],
-      ),
-    );
-  }
-
-  Widget _navItem(IconData icon, String label, bool isSelected, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: isSelected ? const Color(0xFF2563EB) : Colors.grey[600], size: 22),
-          const SizedBox(height: 4),
-          Text(label, style: TextStyle(color: isSelected ? const Color(0xFF2563EB) : Colors.grey[600], fontSize: 10)),
-        ],
-      ),
-    );
   }
 }
 
@@ -205,29 +272,18 @@ class _NotificationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Color typeColor = Color(notification.getColor());
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1F26),
-          borderRadius: BorderRadius.circular(16),
-        ),
+        decoration: BoxDecoration(color: const Color(0xFF1A1F26), borderRadius: BorderRadius.circular(16)),
         child: IntrinsicHeight(
           child: Row(
             children: [
               if (!notification.isRead)
-                Container(
-                  width: 4,
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.only(topLeft: Radius.circular(16), bottomLeft: Radius.circular(16)),
-                  ),
-                )
+                Container(width: 4, decoration: const BoxDecoration(color: Colors.red, borderRadius: BorderRadius.only(topLeft: Radius.circular(16), bottomLeft: Radius.circular(16))))
               else
                 const SizedBox(width: 4),
-
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -236,10 +292,7 @@ class _NotificationCard extends StatelessWidget {
                     children: [
                       Container(
                         padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: typeColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        decoration: BoxDecoration(color: typeColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
                         child: Text(notification.getIcon(), style: const TextStyle(fontSize: 18)),
                       ),
                       const SizedBox(width: 16),
@@ -250,26 +303,12 @@ class _NotificationCard extends StatelessWidget {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Expanded(
-                                  child: Text(
-                                    notification.title,
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                Text(
-                                  _formatRelativeTime(notification.createdAt),
-                                  style: const TextStyle(color: Colors.grey, fontSize: 11),
-                                ),
+                                Expanded(child: Text(notification.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14), overflow: TextOverflow.ellipsis)),
+                                Text(getTimeAgo(notification.createdAt), style: const TextStyle(color: Colors.grey, fontSize: 11)),
                               ],
                             ),
                             const SizedBox(height: 6),
-                            Text(
-                              notification.content,
-                              style: TextStyle(color: Colors.grey[400], fontSize: 13, height: 1.4),
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                            Text(notification.content, style: TextStyle(color: Colors.grey[400], fontSize: 13, height: 1.4), maxLines: 3, overflow: TextOverflow.ellipsis),
                           ],
                         ),
                       ),
@@ -283,11 +322,12 @@ class _NotificationCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  String _formatRelativeTime(DateTime date) {
-    final diff = DateTime.now().difference(date);
-    if (diff.inMinutes < 60) return "${diff.inMinutes} min";
-    if (diff.inHours < 24) return "${diff.inHours}h";
-    return DateFormat('HH:mm').format(date);
-  }
+String getTimeAgo(DateTime date) {
+  final diff = DateTime.now().difference(date);
+  if (diff.inDays > 0) return "${diff.inDays} j";
+  if (diff.inHours > 0) return "${diff.inHours} h";
+  if (diff.inMinutes > 0) return "${diff.inMinutes} min";
+  return "Maintenant";
 }

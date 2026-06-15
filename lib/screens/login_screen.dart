@@ -13,6 +13,7 @@ class _LoginScreenState extends State<LoginScreen> {
   late TextEditingController _usernameController;
   late TextEditingController _passwordController;
   bool _isLoading = false;
+  bool _obscurePassword = true;
   String? _errorMessage;
 
   // ✨ Configuration Google Sign-In compatible WEB et ANDROID
@@ -141,7 +142,16 @@ class _LoginScreenState extends State<LoginScreen> {
       GestureDetector(onTap: () => Navigator.pushNamed(context, '/forgot-password'), child: const Text("Forgot Password?", style: TextStyle(color: Color(0xFF2563EB), fontSize: 12))),
     ]),
     const SizedBox(height: 8),
-    TextField(controller: _passwordController, obscureText: true, style: const TextStyle(color: Colors.white), decoration: _inputDecoration("********", Icons.lock_outline)),
+    TextField(
+      controller: _passwordController,
+      obscureText: _obscurePassword,
+      style: const TextStyle(color: Colors.white),
+      decoration: _inputDecoration(
+        "********",
+        _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+        onIconTap: () => setState(() => _obscurePassword = !_obscurePassword),
+      ),
+    ),
   ]);
 
   Widget _buildLoginButton() => SizedBox(width: double.infinity, height: 52, child: ElevatedButton(onPressed: _isLoading ? null : _login, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text("Sign In", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))));
@@ -151,7 +161,19 @@ class _LoginScreenState extends State<LoginScreen> {
     GestureDetector(onTap: () => Navigator.pushNamed(context, '/register'), child: const Text("Create one for free", style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold))),
   ]);
 
-  InputDecoration _inputDecoration(String hint, IconData icon) => InputDecoration(hintText: hint, hintStyle: TextStyle(color: Colors.grey[700], fontSize: 14), suffixIcon: Icon(icon, color: Colors.grey[700], size: 20), filled: true, fillColor: const Color(0xFF1A1F26), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2A2F36))));
+  InputDecoration _inputDecoration(String hint, IconData icon, {VoidCallback? onIconTap}) => InputDecoration(
+    hintText: hint,
+    hintStyle: TextStyle(color: Colors.grey[700], fontSize: 14),
+    suffixIcon: GestureDetector(
+      onTap: onIconTap,
+      child: Icon(icon, color: Colors.grey[700], size: 20),
+    ),
+    filled: true,
+    fillColor: const Color(0xFF1A1F26),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2A2F36))),
+  );
 
   Widget _socialButton(String label, IconData icon, {VoidCallback? onTap}) => GestureDetector(onTap: onTap, child: Container(width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 14), decoration: BoxDecoration(color: const Color(0xFF1A1F26), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF2A2F36))), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon, color: Colors.white, size: 24), const SizedBox(width: 12), Text(label, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600))])));
 }
